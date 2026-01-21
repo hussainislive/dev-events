@@ -56,13 +56,23 @@ async function EventDetailsContent({ params }: { params: Promise<{ slug: string 
   let event;
   try {
     const res = await fetch(`${BASE_URL}/api/events/${slug}`, { next: { revalidate: 60 } });
-    if (!res.ok) throw new Error(String(res.status));
-    const data = await res.json();
-    event = data.event;
-  } catch {
-    return notFound();
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+    // Check if the response is JSON before parsing
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await res.json();
+      event = data.event;
+    } else {
+      // Handle non-JSON response
+      throw new Error('The response is not in JSON format');
+    }
+  } catch (error) {
+    console.error('Error fetching event:', error);
+    return notFound(); // Return the notFound page if an error occurs
   }
-  if (!event) return notFound();
+
+  if (!event) return notFound(); // Ensure event exists before continuing
 
   const {
     description,
@@ -149,6 +159,7 @@ async function EventDetailsContent({ params }: { params: Promise<{ slug: string 
     </section>
   );
 }
+
 
 /* ---------- page shell – nothing dynamic here ---------- */
 export default function EventDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
