@@ -8,8 +8,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 const page = async () => {
   'use cache';
   cacheLife('hours')
-  const response = await fetch(`${BASE_URL}/api/events`)
-  const { events } = await response.json();
+  const res = await fetch(`${BASE_URL}/api/events`);
+  if (!res.ok) return { events: [] };          // ← add this line
+  const { events } = await res.json();
 
   return (
     <section>
