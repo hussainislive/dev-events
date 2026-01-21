@@ -1,18 +1,20 @@
-import EventBook from "@/app/components/EventBook";
-import EventCard from "@/app/components/EventCard";
-import { IEvent } from "@/database/event.model";
-import { getSimilarEventsBySlug } from "@/lib/actions/event.actions";
-import { cacheLife } from "next/cache";
-import Image from "next/image";
-import { notFound } from "next/navigation";
+import { Suspense } from 'react';
+import EventBook from '@/app/components/EventBook';
+import EventCard from '@/app/components/EventCard';
+import { IEvent } from '@/database/event.model';
+import { getSimilarEventsBySlug } from '@/lib/actions/event.actions';
+import { cacheLife } from 'next/cache';
+import Image from 'next/image';
+import { notFound } from 'next/navigation';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://dev-events-ten-eta.vercel.app';
 
+/* ---------- presentation helpers ---------- */
 const EventAgenda = ({ agendaItems }: { agendaItems: string[] }) => (
   <div className="agenda">
     <h2>Agenda</h2>
     <ul>
-      {agendaItems.map((item) => (
+      {agendaItems.map(item => (
         <li key={item}>{item}</li>
       ))}
     </ul>
@@ -21,8 +23,10 @@ const EventAgenda = ({ agendaItems }: { agendaItems: string[] }) => (
 
 const EventTags = ({ tags }: { tags: string[] }) => (
   <div className="flex flex-row gap-1.5 flex-wrap">
-    {tags.map((tag) => (
-      <div key={tag} className="pill">{tag}</div>
+    {tags.map(tag => (
+      <div key={tag} className="pill">
+        {tag}
+      </div>
     ))}
   </div>
 );
@@ -42,39 +46,23 @@ const EventDetailItem = ({
   </div>
 );
 
-const EventDetailsPage = async ({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) => {
-  "use cache";
-  cacheLife("hours");
+/* ---------- the component that actually needs the slug ---------- */
+async function EventDetailsContent({ params }: { params: Promise<{ slug: string }> }) {
+  'use cache';
+  cacheLife('hours');
 
-  const { slug } = await params;
+  const { slug } = await params; // <-- dynamic data used INSIDE suspense
+
   let event;
-
   try {
-    const request = await fetch(`${BASE_URL}/api/events/${slug}`, {
-      next: { revalidate: 60 },
-    });
-
-    if (!request.ok) {
-      if (request.status === 404) {
-        return notFound();
-      }
-      throw new Error(`Failed to fetch event: ${request.statusText}`);
-    }
-
-    const response = await request.json();
-    event = response.event;
-
-    if (!event) {
-      return notFound();
-    }
-  } catch (error) {
-    console.error(error);
+    const res = await fetch(`${BASE_URL}/api/events/${slug}`, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+    event = data.event;
+  } catch {
     return notFound();
   }
+  if (!event) return notFound();
 
   const {
     description,
@@ -90,10 +78,7 @@ const EventDetailsPage = async ({
     tags,
     organizer,
     _id,
-
   } = event;
-
-  if (!description) return notFound();
 
   const bookings = 10;
   const similarEvents: IEvent[] = await getSimilarEventsBySlug(slug);
@@ -149,9 +134,7 @@ const EventDetailsPage = async ({
             ) : (
               <p className="text-sm">Be the first to book your spot!</p>
             )}
-
             <EventBook eventId={_id.toString()} slug={slug} />
-
           </div>
         </aside>
       </div>
@@ -160,13 +143,18 @@ const EventDetailsPage = async ({
         <h2>Similar Events</h2>
         <div className="events">
           {similarEvents.length > 0 &&
-            similarEvents.map((similarEvent: IEvent) => (
-              <EventCard key={similarEvent.title} {...similarEvent} />
-            ))}
+            similarEvents.map((e: IEvent) => <EventCard key={e.title} {...e} />)}
         </div>
       </div>
     </section>
   );
-};
+}
 
-export default EventDetailsPage;
+/* ---------- page shell – nothing dynamic here ---------- */
+export default function EventDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
+  return (
+    <Suspense fallback={<div>Loading event…</div>}>
+      <EventDetailsContent params={params} />
+    </Suspense>
+  );
+}
