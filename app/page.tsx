@@ -1,15 +1,18 @@
 import { cacheLife } from "next/cache";
-import EventCard from "./components/EventCard"
-import ExploreBtn from "./components/ExploreBtn"
+import EventCard from "./components/EventCard";
+import ExploreBtn from "./components/ExploreBtn";
 import { IEvent } from "@/database/event.model";
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
 const page = async () => {
   'use cache';
-  cacheLife('hours')
-  const res = await fetch(`${BASE_URL}/api/events`);
-  if (!res.ok) return [];          // ← return empty array, not object
+  cacheLife('hours');
+
+  /* ----  internal fetch  ---- */
+  const res = await fetch(new URL('/api/events', process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'), {
+    next: { revalidate: 60 }
+  });
+
+  if (!res.ok) return [];
   const { events } = await res.json();
 
   return (
@@ -29,11 +32,9 @@ const page = async () => {
             </li>
           ))}
         </ul>
-
       </div>
-
     </section>
-  )
-}
+  );
+};
 
-export default page
+export default page;
