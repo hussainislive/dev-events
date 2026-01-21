@@ -3,31 +3,32 @@ import EventCard from "./components/EventCard";
 import ExploreBtn from "./components/ExploreBtn";
 import { IEvent } from "@/database/event.model";
 
-const page = async () => {
+export default async function Page() {
   'use cache';
   cacheLife('hours');
 
-  /* ----  internal fetch  ---- */
-  const res = await fetch(new URL('/api/events', process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'), {
-    next: { revalidate: 60 }
-  });
+  /* 1.  guaranteed internal URL – works both in build & runtime */
+  const base =
+    process.env.NODE_ENV === 'production'
+      ? `http://localhost:3000`          // ← build-time localhost inside serverless
+      : `http://localhost:3000`;
 
+  const res = await fetch(`${base}/api/events`, { next: { revalidate: 60 } });
+
+  /* 2.  fallback only when DB is really empty */
   if (!res.ok) return [];
   const { events } = await res.json();
 
   return (
     <section>
-      <h1 className="text-center">The Hub for Every Dev <br /> Event You Can't Miss</h1>
-      <p className="text-center mt-5">Hackathons, Meetups, and Conderences, All in One Place</p>
-
+      <h1 className="text-center">The Hub for Every Dev <br /> Event You Can&apos;t Miss</h1>
+      <p className="text-center mt-5">Hackathons, Meetups, and Conferences, All in One Place</p>
       <ExploreBtn />
-
       <div className="mt-20 space-y-7">
         <h3>Featured Events</h3>
-
         <ul className="events">
-          {events && events.length > 0 && events.map((event: IEvent) => (
-            <li className="list-none" key={event.title}>
+          {events?.map((event: IEvent) => (
+            <li className="list-none" key={event._id}>
               <EventCard {...event} />
             </li>
           ))}
@@ -35,6 +36,4 @@ const page = async () => {
       </div>
     </section>
   );
-};
-
-export default page;
+}
