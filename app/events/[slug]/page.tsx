@@ -2,6 +2,7 @@ import EventBook from "@/app/components/EventBook";
 import EventCard from "@/app/components/EventCard";
 import { IEvent } from "@/database/event.model";
 import { getSimilarEventsBySlug } from "@/lib/actions/event.actions";
+import { cacheLife } from "next/cache";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
@@ -16,7 +17,7 @@ const EventAgenda = ({ agendaItems }: { agendaItems: string[] }) => (
       ))}
     </ul>
   </div>
-)
+);
 
 const EventTags = ({ tags }: { tags: string[] }) => (
   <div className="flex flex-row gap-1.5 flex-wrap">
@@ -24,24 +25,77 @@ const EventTags = ({ tags }: { tags: string[] }) => (
       <div key={tag} className="pill">{tag}</div>
     ))}
   </div>
-)
+);
 
-const EventDetailItem = ({ icon, alt, label }: { icon: string; alt: string; label: string; }) => (
+const EventDetailItem = ({
+  icon,
+  alt,
+  label,
+}: {
+  icon: string;
+  alt: string;
+  label: string;
+}) => (
   <div className="flex-row-gap-2 items-center">
     <Image src={icon} alt={alt} width={17} height={17} />
     <p>{label}</p>
   </div>
-)
+);
 
-const EventDetailsPage = async ({ params }: { params: Promise<{ slug: string }> }) => {
+const EventDetailsPage = async ({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) => {
+  "use cache";
+  cacheLife("hours");
+
   const { slug } = await params;
-  const request = await fetch(`${BASE_URL}/api/events/${slug}`);
-  const { event: { description, title, image, overview, date, time, location, mode, agenda, audience, tags, organizer } } = await request.json();
+  let event;
+
+  try {
+    const request = await fetch(`${BASE_URL}/api/events/${slug}`, {
+      next: { revalidate: 60 },
+    });
+
+    if (!request.ok) {
+      if (request.status === 404) {
+        return notFound();
+      }
+      throw new Error(`Failed to fetch event: ${request.statusText}`);
+    }
+
+    const response = await request.json();
+    event = response.event;
+
+    if (!event) {
+      return notFound();
+    }
+  } catch (error) {
+    console.error(error);
+    return notFound();
+  }
+
+  const {
+    description,
+    title,
+    image,
+    overview,
+    date,
+    time,
+    location,
+    mode,
+    agenda,
+    audience,
+    tags,
+    organizer,
+    _id,
+
+  } = event;
 
   if (!description) return notFound();
 
   const bookings = 10;
-
   const similarEvents: IEvent[] = await getSimilarEventsBySlug(slug);
 
   return (
@@ -52,9 +106,14 @@ const EventDetailsPage = async ({ params }: { params: Promise<{ slug: string }> 
       </div>
 
       <div className="details">
-        {/* Left Side - Event Content */}
         <div className="content">
-          <Image src={image} alt="Event Banner" width={800} height={800} className="banner" />
+          <Image
+            src={image}
+            alt="Event Banner"
+            width={800}
+            height={800}
+            className="banner"
+          />
 
           <section className="flex-col-gap-2">
             <h2>Overview</h2>
@@ -78,12 +137,8 @@ const EventDetailsPage = async ({ params }: { params: Promise<{ slug: string }> 
           </section>
 
           <EventTags tags={tags} />
-
-
-
         </div>
 
-        {/* Left Side - Event Content */}
         <aside className="booking">
           <div className="signup-card">
             <h2>Book Your Spot</h2>
@@ -95,7 +150,8 @@ const EventDetailsPage = async ({ params }: { params: Promise<{ slug: string }> 
               <p className="text-sm">Be the first to book your spot!</p>
             )}
 
-            <EventBook />
+            <EventBook eventId={_id.toString()} slug={slug} />
+
           </div>
         </aside>
       </div>
@@ -103,13 +159,14 @@ const EventDetailsPage = async ({ params }: { params: Promise<{ slug: string }> 
       <div className="flex w-full flex-col gap-4 pt-20">
         <h2>Similar Events</h2>
         <div className="events">
-          {similarEvents.length > 0 && similarEvents.map((similarEvent: IEvent) => (
-            <EventCard key={similarEvent.title} {...similarEvent} />
-          ))}
+          {similarEvents.length > 0 &&
+            similarEvents.map((similarEvent: IEvent) => (
+              <EventCard key={similarEvent.title} {...similarEvent} />
+            ))}
         </div>
       </div>
     </section>
-  )
-}
+  );
+};
 
-export default EventDetailsPage
+export default EventDetailsPage;
