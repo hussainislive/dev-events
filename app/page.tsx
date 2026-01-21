@@ -9,7 +9,7 @@ const page = async () => {
   'use cache';
   cacheLife('hours')
   const res = await fetch(`${BASE_URL}/api/events`);
-  if (!res.ok) return { events: [] };          // ← add this line
+  if (!res.ok) return [];          // ← return empty array, not object
   const { events } = await res.json();
 
   return (
