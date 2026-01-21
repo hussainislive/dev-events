@@ -2,22 +2,16 @@ import { cacheLife } from "next/cache";
 import EventCard from "./components/EventCard";
 import ExploreBtn from "./components/ExploreBtn";
 import { IEvent } from "@/database/event.model";
+import { GET } from "./api/events/route"; // ← import the handler
 
 export default async function Page() {
   'use cache';
   cacheLife('hours');
 
-  /* 1.  guaranteed internal URL – works both in build & runtime */
-  const base =
-    process.env.NODE_ENV === 'production'
-      ? `http://localhost:3000`          // ← build-time localhost inside serverless
-      : `http://localhost:3000`;
-
-  const res = await fetch(`${base}/api/events`, { next: { revalidate: 60 } });
-
-  /* 2.  fallback only when DB is really empty */
-  if (!res.ok) return [];
-  const { events } = await res.json();
+  /* 1.  call the handler directly (no fetch, no port) */
+  const response = await GET();               // ← same as HTTP call, but local
+  if (!response.ok) return [];
+  const { events } = await response.json();
 
   return (
     <section>
@@ -28,7 +22,7 @@ export default async function Page() {
         <h3>Featured Events</h3>
         <ul className="events">
           {events?.map((event: IEvent) => (
-            <li className="list-none" key={event._id}>
+            <li className="list-none" key={String(event._id)}>
               <EventCard {...event} />
             </li>
           ))}
